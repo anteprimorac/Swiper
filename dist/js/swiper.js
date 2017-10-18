@@ -7,7 +7,7 @@
  *
  * Released under the MIT License
  *
- * Released on: October 11, 2017
+ * Released on: October 18, 2017
  */
 
 (function (global, factory) {
@@ -2983,7 +2983,7 @@ function getBreakpoint(breakpoints) {
 var setBreakpoint = function () {
   var swiper = this;
   var activeIndex = swiper.activeIndex;
-  var loopedSlides = swiper.loopedSlides;
+  var loopedSlides = swiper.loopedSlides; if ( loopedSlides === void 0 ) loopedSlides = 0;
   var params = swiper.params;
   var breakpoints = params.breakpoints;
   if (!breakpoints || (breakpoints && Object.keys(breakpoints).length === 0)) { return; }
@@ -3908,7 +3908,7 @@ var Virtual = {
     var $slideEl = params.renderSlide
       ? $$1(params.renderSlide.call(swiper, slide, index))
       : $$1(("<div class=\"" + (swiper.params.slideClass) + "\" data-swiper-slide-index=\"" + index + "\">" + slide + "</div>"));
-
+    if (!$slideEl.attr('data-swiper-slide-index')) { $slideEl.attr('data-swiper-slide-index', index); }
     if (params.cache) { swiper.virtual.cache[index] = $slideEl; }
     return $slideEl;
   },
@@ -5114,11 +5114,11 @@ var Parallax = {
       y = (y * progress) + "px";
     }
 
-    if (typeof pOpacity !== 'undefined' && opacity !== null) {
+    if (typeof opacity !== 'undefined' && opacity !== null) {
       var currentOpacity = opacity - ((opacity - 1) * (1 - Math.abs(progress)));
       $el[0].style.opacity = currentOpacity;
     }
-    if (typeof pScale === 'undefined' || scale === null) {
+    if (typeof scale === 'undefined' || scale === null) {
       $el.transform(("translate3d(" + x + ", " + y + ", 0px)"));
     } else {
       var currentScale = scale - ((scale - 1) * (1 - Math.abs(progress)));
@@ -5720,8 +5720,12 @@ var Lazy = {
     var params = swiper.params.lazy;
     if (typeof index === 'undefined') { return; }
     if (swiper.slides.length === 0) { return; }
+    var isVirtual = swiper.virtual && swiper.params.virtual.enabled;
 
-    var $slideEl = swiper.slides.eq(index);
+    var $slideEl = isVirtual
+      ? swiper.$wrapperEl.children(("." + (swiper.params.slideClass) + "[data-swiper-slide-index=\"" + index + "\"]"))
+      : swiper.slides.eq(index);
+
     var $images = $slideEl.find(("." + (params.elementClass) + ":not(." + (params.loadedClass) + "):not(." + (params.loadingClass) + ")"));
     if ($slideEl.hasClass(params.elementClass) && !$slideEl.hasClass(params.loadedClass) && !$slideEl.hasClass(params.loadingClass)) {
       $images = $images.add($slideEl[0]);
@@ -5781,6 +5785,7 @@ var Lazy = {
     var swiperParams = swiper.params;
     var slides = swiper.slides;
     var activeIndex = swiper.activeIndex;
+    var isVirtual = swiper.virtual && swiperParams.virtual.enabled;
     var params = swiperParams.lazy;
 
     var slidesPerView = swiperParams.slidesPerView;
@@ -5788,14 +5793,30 @@ var Lazy = {
       slidesPerView = 0;
     }
 
+    function slideExist(index) {
+      if (isVirtual) {
+        if ($wrapperEl.children(("." + (swiperParams.slideClass) + "[data-swiper-slide-index=\"" + index + "\"]")).length) {
+          return true;
+        }
+      } else if (slides[index]) { return true; }
+      return false;
+    }
+    function slideIndex(slideEl) {
+      if (isVirtual) {
+        return $$1(slideEl).attr('data-swiper-slide-index');
+      }
+      return $$1(slideEl).index();
+    }
+
     if (!swiper.lazy.initialImageLoaded) { swiper.lazy.initialImageLoaded = true; }
     if (swiper.params.watchSlidesVisibility) {
-      $wrapperEl.children(("." + (swiperParams.slideVisibleClass))).each(function (index, slideEl) {
-        swiper.lazy.loadImagesInSlide($$1(slideEl).index());
+      $wrapperEl.children(("." + (swiperParams.slideVisibleClass))).each(function (elIndex, slideEl) {
+        var index = isVirtual ? $$1(slideEl).attr('data-swiper-slide-index') : $$1(slideEl).index();
+        swiper.lazy.loadImagesInSlide(index);
       });
     } else if (slidesPerView > 1) {
       for (var i = activeIndex; i < activeIndex + slidesPerView; i += 1) {
-        if (slides[i]) { swiper.lazy.loadImagesInSlide(i); }
+        if (slideExist(i)) { swiper.lazy.loadImagesInSlide(i); }
       }
     } else {
       swiper.lazy.loadImagesInSlide(activeIndex);
@@ -5808,18 +5829,18 @@ var Lazy = {
         var minIndex = Math.max(activeIndex - Math.max(spv, amount), 0);
         // Next Slides
         for (var i$1 = activeIndex + slidesPerView; i$1 < maxIndex; i$1 += 1) {
-          if (slides[i$1]) { swiper.lazy.loadImagesInSlide(i$1); }
+          if (slideExist(i$1)) { swiper.lazy.loadImagesInSlide(i$1); }
         }
         // Prev Slides
         for (var i$2 = minIndex; i$2 < activeIndex; i$2 += 1) {
-          if (slides[i$2]) { swiper.lazy.loadImagesInSlide(i$2); }
+          if (slideExist(i$2)) { swiper.lazy.loadImagesInSlide(i$2); }
         }
       } else {
         var nextSlide = $wrapperEl.children(("." + (swiperParams.slideNextClass)));
-        if (nextSlide.length > 0) { swiper.lazy.loadImagesInSlide(nextSlide.index()); }
+        if (nextSlide.length > 0) { swiper.lazy.loadImagesInSlide(slideIndex(nextSlide)); }
 
         var prevSlide = $wrapperEl.children(("." + (swiperParams.slidePrevClass)));
-        if (prevSlide.length > 0) { swiper.lazy.loadImagesInSlide(prevSlide.index()); }
+        if (prevSlide.length > 0) { swiper.lazy.loadImagesInSlide(slideIndex(prevSlide)); }
       }
     }
   },

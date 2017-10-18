@@ -7,7 +7,7 @@
  *
  * Released under the MIT License
  *
- * Released on: October 11, 2017
+ * Released on: October 18, 2017
  */
 
 import { $, add, addClass, append, attr, children, closest, css, data, each, eq, find, hasClass, html, index, is, next, nextAll, off, offset, on, outerHeight, outerWidth, parent, parents, prepend, prev, prevAll, remove, removeAttr, removeClass, styles, text, toggleClass, transform, transition, transitionEnd, trigger } from 'dom7/dist/dom7.modular';
@@ -2120,7 +2120,7 @@ function getBreakpoint(breakpoints) {
 
 var setBreakpoint = function () {
   const swiper = this;
-  const { activeIndex, loopedSlides, params } = swiper;
+  const { activeIndex, loopedSlides = 0, params } = swiper;
   const breakpoints = params.breakpoints;
   if (!breakpoints || (breakpoints && Object.keys(breakpoints).length === 0)) return;
   // Set breakpoint for window width and update parameters
@@ -3013,7 +3013,7 @@ const Virtual = {
     const $slideEl = params.renderSlide
       ? $(params.renderSlide.call(swiper, slide, index$$1))
       : $(`<div class="${swiper.params.slideClass}" data-swiper-slide-index="${index$$1}">${slide}</div>`);
-
+    if (!$slideEl.attr('data-swiper-slide-index')) $slideEl.attr('data-swiper-slide-index', index$$1);
     if (params.cache) swiper.virtual.cache[index$$1] = $slideEl;
     return $slideEl;
   },
@@ -4200,11 +4200,11 @@ const Parallax = {
       y = `${y * progress}px`;
     }
 
-    if (typeof pOpacity !== 'undefined' && opacity !== null) {
+    if (typeof opacity !== 'undefined' && opacity !== null) {
       const currentOpacity = opacity - ((opacity - 1) * (1 - Math.abs(progress)));
       $el[0].style.opacity = currentOpacity;
     }
-    if (typeof pScale === 'undefined' || scale === null) {
+    if (typeof scale === 'undefined' || scale === null) {
       $el.transform(`translate3d(${x}, ${y}, 0px)`);
     } else {
       const currentScale = scale - ((scale - 1) * (1 - Math.abs(progress)));
@@ -4794,8 +4794,12 @@ const Lazy = {
     const params = swiper.params.lazy;
     if (typeof index$$1 === 'undefined') return;
     if (swiper.slides.length === 0) return;
+    const isVirtual = swiper.virtual && swiper.params.virtual.enabled;
 
-    const $slideEl = swiper.slides.eq(index$$1);
+    const $slideEl = isVirtual
+      ? swiper.$wrapperEl.children(`.${swiper.params.slideClass}[data-swiper-slide-index="${index$$1}"]`)
+      : swiper.slides.eq(index$$1);
+
     let $images = $slideEl.find(`.${params.elementClass}:not(.${params.loadedClass}):not(.${params.loadingClass})`);
     if ($slideEl.hasClass(params.elementClass) && !$slideEl.hasClass(params.loadedClass) && !$slideEl.hasClass(params.loadingClass)) {
       $images = $images.add($slideEl[0]);
@@ -4852,6 +4856,7 @@ const Lazy = {
   load() {
     const swiper = this;
     const { $wrapperEl, params: swiperParams, slides, activeIndex } = swiper;
+    const isVirtual = swiper.virtual && swiperParams.virtual.enabled;
     const params = swiperParams.lazy;
 
     let slidesPerView = swiperParams.slidesPerView;
@@ -4859,14 +4864,30 @@ const Lazy = {
       slidesPerView = 0;
     }
 
+    function slideExist(index$$1) {
+      if (isVirtual) {
+        if ($wrapperEl.children(`.${swiperParams.slideClass}[data-swiper-slide-index="${index$$1}"]`).length) {
+          return true;
+        }
+      } else if (slides[index$$1]) return true;
+      return false;
+    }
+    function slideIndex(slideEl) {
+      if (isVirtual) {
+        return $(slideEl).attr('data-swiper-slide-index');
+      }
+      return $(slideEl).index();
+    }
+
     if (!swiper.lazy.initialImageLoaded) swiper.lazy.initialImageLoaded = true;
     if (swiper.params.watchSlidesVisibility) {
-      $wrapperEl.children(`.${swiperParams.slideVisibleClass}`).each((index$$1, slideEl) => {
-        swiper.lazy.loadImagesInSlide($(slideEl).index());
+      $wrapperEl.children(`.${swiperParams.slideVisibleClass}`).each((elIndex, slideEl) => {
+        const index$$1 = isVirtual ? $(slideEl).attr('data-swiper-slide-index') : $(slideEl).index();
+        swiper.lazy.loadImagesInSlide(index$$1);
       });
     } else if (slidesPerView > 1) {
       for (let i = activeIndex; i < activeIndex + slidesPerView; i += 1) {
-        if (slides[i]) swiper.lazy.loadImagesInSlide(i);
+        if (slideExist(i)) swiper.lazy.loadImagesInSlide(i);
       }
     } else {
       swiper.lazy.loadImagesInSlide(activeIndex);
@@ -4879,18 +4900,18 @@ const Lazy = {
         const minIndex = Math.max(activeIndex - Math.max(spv, amount), 0);
         // Next Slides
         for (let i = activeIndex + slidesPerView; i < maxIndex; i += 1) {
-          if (slides[i]) swiper.lazy.loadImagesInSlide(i);
+          if (slideExist(i)) swiper.lazy.loadImagesInSlide(i);
         }
         // Prev Slides
         for (let i = minIndex; i < activeIndex; i += 1) {
-          if (slides[i]) swiper.lazy.loadImagesInSlide(i);
+          if (slideExist(i)) swiper.lazy.loadImagesInSlide(i);
         }
       } else {
         const nextSlide = $wrapperEl.children(`.${swiperParams.slideNextClass}`);
-        if (nextSlide.length > 0) swiper.lazy.loadImagesInSlide(nextSlide.index());
+        if (nextSlide.length > 0) swiper.lazy.loadImagesInSlide(slideIndex(nextSlide));
 
         const prevSlide = $wrapperEl.children(`.${swiperParams.slidePrevClass}`);
-        if (prevSlide.length > 0) swiper.lazy.loadImagesInSlide(prevSlide.index());
+        if (prevSlide.length > 0) swiper.lazy.loadImagesInSlide(slideIndex(prevSlide));
       }
     }
   },
